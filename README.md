@@ -15,6 +15,8 @@ Godot game project.
 
 4. In Godot's Project Manager, select **Import**, choose this repository folder, and open `project.godot`.
 
+5. Press **F6** or the play button to run the starter world. Move the placeholder character with **WASD** or the arrow keys.
+
 ## Development notes
 
 - Engine: Godot 4.7.2 (Standard)
@@ -23,6 +25,13 @@ Godot game project.
 - Before making changes, run `git pull`.
 - After testing your work, use `git status`, `git add`, `git commit`, and `git push` to share it.
 
-## First project setup
+## Starter world
 
-This repository currently has no Godot project files. Create the project in the repository root, then commit the generated `project.godot`, scenes, scripts, and assets. Do not commit `.godot/`.
+The project contains a deliberately small playable scene: one screen-sized world, a circular placeholder character, and solid obstacles. It is the foundation for later maps, characters, and interactions.
+
+Important project files:
+
+- `project.godot`: Godot project settings and startup scene.
+- `scenes/world.tscn`: The starter world scene.
+- `scripts/player.gd`: Player movement.
+- `scripts/world.gd`: World visuals and obstacle collision.

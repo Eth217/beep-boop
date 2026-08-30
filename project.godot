@@ -1,0 +1,21 @@
+; Engine configuration file.
+; Edit this in Godot rather than by hand when possible.
+config_version=5
+
+[application]
+
+config/name="Reimagined Spoon"
+run/main_scene="res://scenes/world.tscn"
+
+[display]
+
+window/size/viewport_width=960
+window/size/viewport_height=540
+window/size/window_width_override=960
+window/size/window_height_override=540
+window/stretch/mode="canvas_items"
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
