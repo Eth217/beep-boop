@@ -6,6 +6,12 @@ const GAME_PORT := 7000
 const MAX_PLAYERS := 4
 const PLAYER_SCENE := preload("res://scenes/player.tscn")
 const BULLET_SCENE := preload("res://scenes/bullet.tscn")
+const STANDARD_BULLET_DAMAGE := 10
+const STANDARD_BULLET_SPEED := 600.0
+const STANDARD_BULLET_RADIUS := 6.0
+const FIREBALL_DAMAGE := 50
+const FIREBALL_SPEED := 420.0
+const FIREBALL_RADIUS := 14.0
 
 var obstacles := [
 	# Screen boundaries.
@@ -166,6 +172,7 @@ func spawn_player(peer_id: int, spawn_position: Vector2) -> void:
 	players.add_child(player)
 	players_by_peer[peer_id] = player
 	player.fire_requested.connect(_on_player_fire_requested)
+	player.fireball_requested.connect(_on_player_fireball_requested)
 
 
 @rpc("authority", "call_local", "reliable")
@@ -178,24 +185,32 @@ func remove_player(peer_id: int) -> void:
 
 
 func _on_player_fire_requested(shooter_peer_id: int, direction: Vector2) -> void:
+	_spawn_projectile(shooter_peer_id, direction, STANDARD_BULLET_DAMAGE, STANDARD_BULLET_SPEED, STANDARD_BULLET_RADIUS, false)
+
+
+func _on_player_fireball_requested(shooter_peer_id: int, direction: Vector2) -> void:
+	_spawn_projectile(shooter_peer_id, direction, FIREBALL_DAMAGE, FIREBALL_SPEED, FIREBALL_RADIUS, true)
+
+
+func _spawn_projectile(shooter_peer_id: int, direction: Vector2, damage: int, speed: float, radius: float, is_fireball: bool) -> void:
 	if not multiplayer.is_server() or not players_by_peer.has(shooter_peer_id):
 		return
 
 	var player := players_by_peer[shooter_peer_id]
-	var spawn_position := player.global_position + direction * 28.0
-	spawn_bullet.rpc(next_bullet_id, shooter_peer_id, spawn_position, direction)
+	var spawn_position := player.global_position + direction * (18.0 + radius + 4.0)
+	spawn_bullet.rpc(next_bullet_id, shooter_peer_id, spawn_position, direction, damage, speed, radius, is_fireball)
 	next_bullet_id += 1
 
 
 @rpc("authority", "call_local", "reliable")
-func spawn_bullet(bullet_id: int, shooter_peer_id: int, spawn_position: Vector2, direction: Vector2) -> void:
+func spawn_bullet(bullet_id: int, shooter_peer_id: int, spawn_position: Vector2, direction: Vector2, damage: int, speed: float, radius: float, is_fireball: bool) -> void:
 	if bullets_by_id.has(bullet_id):
 		return
 
 	var bullet := BULLET_SCENE.instantiate() as NetworkBullet
 	bullet.name = "Bullet_%d" % bullet_id
 	bullets.add_child(bullet)
-	bullet.setup(bullet_id, shooter_peer_id, spawn_position, direction)
+	bullet.setup(bullet_id, shooter_peer_id, spawn_position, direction, damage, speed, radius, is_fireball)
 	bullets_by_id[bullet_id] = bullet
 	bullet.impacted.connect(_on_bullet_impacted)
 
@@ -215,7 +230,7 @@ func _on_bullet_impacted(bullet: NetworkBullet, hit_body: Node2D) -> void:
 		return
 
 	if hit_body is NetworkPlayer:
-		hit_body.take_damage(10)
+		hit_body.take_damage(bullet.damage)
 		if _living_player_count() <= 1:
 			_finish_round()
 
@@ -346,7 +361,12 @@ func _set_status(message: String) -> void:
 
 
 func _spawn_position_for(peer_id: int) -> Vector2:
-	var spawn_points := [Vector2(96, 270), Vector2(150, 270), Vector2(96, 330), Vector2(150, 330)]
+	var spawn_points := [
+		Vector2(96, 270), # Left
+		Vector2(864, 270), # Right
+		Vector2(520, 75), # Top
+		Vector2(520, 455), # Bottom
+	]
 	return spawn_points[(peer_id - 1) % spawn_points.size()]
 
 

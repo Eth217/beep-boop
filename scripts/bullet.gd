@@ -8,6 +8,9 @@ var bullet_id := -1
 var shooter_peer_id := 0
 var direction := Vector2.RIGHT
 var remaining_lifetime := 0.0
+var damage := 10
+var projectile_radius := 6.0
+var is_fireball := false
 
 signal impacted(bullet: NetworkBullet, hit_body: Node2D)
 
@@ -18,12 +21,21 @@ func _ready() -> void:
 	queue_redraw()
 
 
-func setup(id: int, shooter_id: int, start_position: Vector2, aim_direction: Vector2) -> void:
+func setup(id: int, shooter_id: int, start_position: Vector2, aim_direction: Vector2, new_damage: int, new_speed: float, new_radius: float, fireball: bool) -> void:
 	bullet_id = id
 	shooter_peer_id = shooter_id
 	global_position = start_position
 	direction = aim_direction.normalized()
+	damage = new_damage
+	speed = new_speed
+	projectile_radius = new_radius
+	is_fireball = fireball
 	rotation = direction.angle()
+	var collision_shape := $CollisionShape2D as CollisionShape2D
+	var shape := CircleShape2D.new()
+	shape.radius = projectile_radius
+	collision_shape.shape = shape
+	queue_redraw()
 
 
 func simulate_server_movement(delta: float) -> bool:
@@ -49,4 +61,4 @@ func _on_body_entered(body: Node2D) -> void:
 
 
 func _draw() -> void:
-	draw_circle(Vector2.ZERO, 6.0, Color("fff3a0"))
+	draw_circle(Vector2.ZERO, projectile_radius, Color("ff7f27") if is_fireball else Color("fff3a0"))
