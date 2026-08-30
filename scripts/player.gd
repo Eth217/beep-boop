@@ -3,6 +3,9 @@ extends CharacterBody2D
 
 const MAX_HEALTH := 100
 const FIREBALL_CHARGE_TIME := 3.0
+const DASH_DISTANCE := 140.0
+const DASH_COOLDOWN := 3.0
+const DASH_DURATION := 0.28
 
 @export var speed := 230.0
 @export var fire_cooldown := 0.22
@@ -15,13 +18,26 @@ var round_active := true
 var is_charging := false
 var charge_progress := 0.0
 var charge_started_time_ms := 0
+var last_dash_time_ms := -3000
+var was_space_pressed := false
+var is_dashing := false
+var dash_direction := Vector2.ZERO
+var dash_elapsed := 0.0
 
 signal fire_requested(shooter_peer_id: int, direction: Vector2)
 signal fireball_requested(shooter_peer_id: int, direction: Vector2)
 
+@onready var camera: Camera2D = $Camera2D
+
 
 func _ready() -> void:
+	camera.enabled = multiplayer.get_unique_id() == owner_peer_id
 	queue_redraw()
+
+
+func _process(_delta: float) -> void:
+	if is_charging and charge_progress >= 1.0:
+		queue_redraw()
 
 
 func _physics_process(_delta: float) -> void:
@@ -46,13 +62,21 @@ func _physics_process(_delta: float) -> void:
 	elif Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		_request_fire(_aim_direction())
 
+	var space_pressed := Input.is_key_pressed(KEY_SPACE)
+	if space_pressed and not was_space_pressed:
+		_request_dash(direction)
+	was_space_pressed = space_pressed
 
-func simulate_server_movement() -> void:
+
+func simulate_server_movement(delta: float) -> void:
 	if not multiplayer.is_server():
 		return
 
-	velocity = input_direction * speed
-	move_and_slide()
+	if is_dashing:
+		_simulate_dash(delta)
+	else:
+		velocity = input_direction * speed
+		move_and_slide()
 	_update_charge_progress()
 	sync_state.rpc(position, velocity, health, charge_progress, is_charging)
 
@@ -166,6 +190,60 @@ func _update_charge_progress() -> void:
 	if not is_charging:
 		return
 	charge_progress = minf(float(Time.get_ticks_msec() - charge_started_time_ms) / (FIREBALL_CHARGE_TIME * 1000.0), 1.0)
+	queue_redraw()
+
+
+func _request_dash(direction: Vector2) -> void:
+	if direction.is_zero_approx():
+		return
+
+	if multiplayer.is_server():
+		dash_on_server(direction)
+	else:
+		submit_dash.rpc_id(1, direction)
+
+
+@rpc("any_peer", "reliable")
+func submit_dash(direction: Vector2) -> void:
+	if not multiplayer.is_server():
+		return
+	if multiplayer.get_remote_sender_id() != owner_peer_id:
+		return
+	dash_on_server(direction)
+
+
+func dash_on_server(direction: Vector2) -> void:
+	if not round_active or is_dashing or direction.is_zero_approx():
+		return
+
+	var current_time_ms := Time.get_ticks_msec()
+	if current_time_ms - last_dash_time_ms < int(DASH_COOLDOWN * 1000.0):
+		return
+
+	last_dash_time_ms = current_time_ms
+	is_dashing = true
+	dash_direction = direction.normalized()
+	dash_elapsed = 0.0
+
+
+func _simulate_dash(delta: float) -> void:
+	var previous_progress := dash_elapsed / DASH_DURATION
+	dash_elapsed = minf(dash_elapsed + delta, DASH_DURATION)
+	var current_progress := dash_elapsed / DASH_DURATION
+	var movement_distance := DASH_DISTANCE * (_dash_distance_fraction(current_progress) - _dash_distance_fraction(previous_progress))
+	velocity = dash_direction * movement_distance / delta
+	if move_and_collide(dash_direction * movement_distance):
+		is_dashing = false
+		velocity = Vector2.ZERO
+		return
+
+	if dash_elapsed >= DASH_DURATION:
+		is_dashing = false
+		velocity = Vector2.ZERO
+
+
+func _dash_distance_fraction(progress: float) -> float:
+	return progress * progress * (3.0 - 2.0 * progress)
 
 
 func stop_charging() -> void:
@@ -199,6 +277,11 @@ func reset_for_round(spawn_position: Vector2) -> void:
 	input_direction = Vector2.ZERO
 	health = MAX_HEALTH
 	round_active = true
+	last_dash_time_ms = -3000
+	was_space_pressed = false
+	is_dashing = false
+	dash_direction = Vector2.ZERO
+	dash_elapsed = 0.0
 	stop_charging()
 	queue_redraw()
 
@@ -208,6 +291,7 @@ func set_round_active(is_active: bool) -> void:
 	if not is_active:
 		input_direction = Vector2.ZERO
 		velocity = Vector2.ZERO
+		is_dashing = false
 		stop_charging()
 
 
@@ -223,6 +307,10 @@ func _draw() -> void:
 
 	if is_charging:
 		var charge_bar_rect := Rect2(-20, -42, 40, 6)
-		var charge_color := Color("ff9f43") if charge_progress < 1.0 else Color("fff3a0")
+		var fill_width := 38.0 * clampf(charge_progress, 0.0, 1.0)
+		var charge_color := Color("dc2626")
+		if charge_progress >= 1.0:
+			var flash_strength := (sin(float(Time.get_ticks_msec()) * 0.015) + 1.0) * 0.5
+			charge_color = Color("ff4d4d").lerp(Color.WHITE, flash_strength)
 		draw_rect(charge_bar_rect, Color("251f24"))
-		draw_rect(Rect2(-19, -41, 38.0 * charge_progress, 4), charge_color)
+		draw_rect(Rect2(-19, -41, fill_width, 4), charge_color)

@@ -1,6 +1,6 @@
 extends Node2D
 
-const WORLD_SIZE := Vector2(960, 540)
+const WORLD_SIZE := Vector2(1600, 900)
 const BORDER_THICKNESS := 32.0
 const GAME_PORT := 7000
 const MAX_PLAYERS := 4
@@ -19,10 +19,17 @@ var obstacles := [
 	Rect2(0, WORLD_SIZE.y, WORLD_SIZE.x, BORDER_THICKNESS),
 	Rect2(-BORDER_THICKNESS, 0, BORDER_THICKNESS, WORLD_SIZE.y),
 	Rect2(WORLD_SIZE.x, 0, BORDER_THICKNESS, WORLD_SIZE.y),
-	# Visible obstacles.
-	Rect2(230, 120, 210, 46),
-	Rect2(600, 220, 110, 190),
-	Rect2(250, 385, 240, 48),
+	# Arena obstacles.
+	Rect2(250, 150, 220, 48),
+	Rect2(680, 120, 54, 250),
+	Rect2(1050, 140, 280, 48),
+	Rect2(190, 410, 200, 54),
+	Rect2(510, 500, 310, 50),
+	Rect2(960, 380, 56, 270),
+	Rect2(1210, 450, 220, 52),
+	Rect2(310, 700, 300, 48),
+	Rect2(760, 690, 180, 50),
+	Rect2(1120, 700, 270, 48),
 ]
 
 @onready var players: Node2D = $Players
@@ -57,7 +64,7 @@ func _physics_process(_delta: float) -> void:
 	if not multiplayer.is_server() or not game_active:
 		return
 	for player in players_by_peer.values():
-		player.simulate_server_movement()
+		player.simulate_server_movement(_delta)
 	for bullet in bullets_by_id.values():
 		if bullet.simulate_server_movement(_delta):
 			remove_bullet.rpc(bullet.bullet_id)
@@ -362,10 +369,10 @@ func _set_status(message: String) -> void:
 
 func _spawn_position_for(peer_id: int) -> Vector2:
 	var spawn_points := [
-		Vector2(96, 270), # Left
-		Vector2(864, 270), # Right
-		Vector2(520, 75), # Top
-		Vector2(520, 455), # Bottom
+		Vector2(110, 450), # Left
+		Vector2(1490, 450), # Right
+		Vector2(820, 80), # Top
+		Vector2(820, 810), # Bottom
 	]
 	return spawn_points[(peer_id - 1) % spawn_points.size()]
 

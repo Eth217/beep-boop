@@ -16,4 +16,4 @@ offset_right = 760.0
 offset_bottom = 50.0
 theme_override_colors/font_color = Color(0.1, 0.16, 0.12, 1)
 theme_override_font_sizes/font_size = 18
-text = "LAN co-op: host or join, move with WASD/arrow keys, and fire with the left mouse button"
+text = "Large arena co-op: host or join, move with WASD/arrow keys, and fire with the left mouse button"
